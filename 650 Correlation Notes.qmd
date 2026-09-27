@@ -12,7 +12,12 @@ You will likely need to install packages before loading the following libraries.
 # I'm using quietly = T to silence messages; feel free to set to False to view them.
 
 library(tidyverse, quietly = T)             # for dplyr & ggplot
-library(stats, quietly = T)
+# library(stats, quietly = T)
+# install.packages("correlationfunnel")
+# install.packages("Hmisc")
+# install.packages("psych")
+# install.packages("corrgram")
+# install.packages("DataExplorer")
 library(correlationfunnel, quietly = T)
 library(Hmisc, quietly = T)                 # for describe()
 library(psych, quietly = T)                 # for describe()
