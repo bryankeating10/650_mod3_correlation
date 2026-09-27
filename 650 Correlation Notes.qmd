@@ -1,0 +1,1204 @@
+---
+title: "650_Correlation Notes"
+format: html
+editor: visual
+---
+
+# Preliminaries
+
+You will likely need to install packages before loading the following libraries.
+
+```{r}
+# I'm using quietly = T to silence messages; feel free to set to False to view them.
+
+library(tidyverse, quietly = T)             # for dplyr & ggplot
+library(stats, quietly = T)
+library(correlationfunnel, quietly = T)
+library(Hmisc, quietly = T)                 # for describe()
+library(psych, quietly = T)                 # for describe()
+library(corrgram, quietly = T)              # for correlograms
+library(DataExplorer, quietly = T)          # for EDA
+
+```
+
+## Conflicting Packages
+
+```{r}
+#install.packages("conflicted")
+
+library(conflicted)
+```
+
+```{r}
+conflicts_prefer(dplyr::select)
+conflicts_prefer(dplyr::filter)
+conflicts_prefer(dplyr::group_by)
+
+# Conflicts with stats, MASS, plotly packages
+
+```
+
+------------------------------------------------------------------------
+
+## Data Types
+
+- Categorical (Qualitative)
+
+  - Nominal
+
+  - Ordinal
+
+  - Categorical coded numeric
+
+```{r}
+# When you create a factor for nominal data, R does not assume any order among the levels
+
+year <- c("Freshman", "Senior", "Junior", "Sophomore")
+year
+class(year)
+
+yearFactor <- factor(c("Freshman", "Senior", "Junior", "Sophomore"))
+yearFactor
+class(yearFactor)
+
+```
+
+You must tell R when a variable is ordinal (an "ordered factor")
+
+```{r}
+ education <- factor(c("Bachelor's", "High School", "PhD", "Master's"),
+                    levels = c("High School", "Bachelor's", "Master's", "PhD"),
+                    ordered = T)
+education
+
+```
+
+- Numeric (Quantitative)
+
+  - All numbers are not automatically numeric data (e.g., Zip code, area code, SSN)
+
+  - Numeric in categories (Age 18-25, 26-35, ...)
+
+- Binary
+
+  - 0s and 1s
+  - Boolean: True/False
+
+- Text, character
+
+- Audio, visual
+
+------------------------------------------------------------------------
+
+## Analyzing Graphically and Numerically
+
+See the ggplot module for more information and examples
+
++----------------------------------------+------------------------------------------------+------------------------------------------------------+
+| Type of Variable(s)                    | Graphical                                      | Numerical                                            |
++========================================+================================================+======================================================+
+| One Categorical Variable               | Bar graph, Segmented bar graph (and pie chart) | Counts (i.e., frequencies), Percentages, Proportions |
++----------------------------------------+------------------------------------------------+------------------------------------------------------+
+| One Quantitative Variable              | Dotplot, Stemplot                              | Measures of center                                   |
+|                                        |                                                |                                                      |
+|                                        | Histogram, Density curve                       | Measures of spread                                   |
+|                                        |                                                |                                                      |
+|                                        | Boxplot                                        | Measures of shape                                    |
++----------------------------------------+------------------------------------------------+------------------------------------------------------+
+| One Quantitative Various Across Groups | Parallel boxplots                              | Measures of center                                   |
+|                                        |                                                |                                                      |
+| (One Quant & One Categorical)          | Comparative histograms                         | Measures of spread                                   |
+|                                        |                                                |                                                      |
+|                                        | Violin plot                                    | Measures of shape                                    |
++----------------------------------------+------------------------------------------------+------------------------------------------------------+
+| Two Categorical Variables              | Segmented bar graph                            | Counts, Percentages, Proportions by Group            |
+|                                        |                                                |                                                      |
+|                                        | Mosaic plot                                    |                                                      |
++----------------------------------------+------------------------------------------------+------------------------------------------------------+
+| Two Quantitative Variables             | Scatterplot                                    | Correlation                                          |
+|                                        |                                                |                                                      |
+|                                        |                                                | Regression output                                    |
++----------------------------------------+------------------------------------------------+------------------------------------------------------+
+
+[More types of graphical displays](https://www.thoughtspot.com/data-trends/data-visualization/types-of-charts-graphs)
+
+------------------------------------------------------------------------
+
+Extension: Find your own data and analyze it graphically and numerically!
+
+------------------------------------------------------------------------
+
+## *Packages vs Libraries*
+
+*Packages* are collections of R functions, data, and compiled code in a well-defined format. The directory where packages are stored is called the *library*.
+
+[Packages vs Libraries in R](https://www.r-bloggers.com/2013/01/packages-v-libraries-in-r/)
+
+[A Succinct Intro to R](https://r-guide.steveharoz.com/libraries-and-packages.html), Haroz
+
+------------------------------------------------------------------------
+
+## ---
+
+# Exploring SPi
+
+The Soccer Power Index (SPi)
+
+- The data was provided on GitHub by [fivethirtyeight.com](https://github.com/fivethirtyeight/data/tree/master/soccer-spi) (accessed July 9, 2024)
+
+- See the link above for the metadata on global rankings.
+
+Codebooks and data dictionaries are vital in data analytics!
+
+------------------------------------------------------------------------
+
+## Load SPi data
+
+`spi_global_rankings.csv` is available on Brightspace; be sure to save the CSV in the same folder as this QMD notebook
+
+```{r}
+global <- read_csv("spi_global_rankings.csv", show_col_types = T)
+
+```
+
+## View SPi data
+
+```{r}
+View(global)
+```
+
+```{r}
+
+table(global$league)
+```
+
+```{r}
+# Should we convert league from character to a factor?
+table(global$league) |> 
+  as.data.frame() |> 
+  arrange(desc(Freq))
+```
+
+When working with large data sets containing categorical data, converting to factors can optimize memory usage and speed up computations (stores label instead of string)
+
+------------------------------------------------------------------------
+
+Here's another reason to change from character to **factor**. Consider the following boxplots:
+
+```{r}
+# One quantitative (SPI) among Groups (league)
+
+global |>
+  ggplot(aes(x = spi, y = league)) +
+  geom_boxplot() +
+  theme(axis.text = element_text(size = 8))
+```
+
+```{r}
+# Change character data to factors
+global <- read_csv("spi_global_rankings.csv", col_types = "iiffddd")
+
+# integer, factor, double
+```
+
+```{r}
+# Now consider the boxplots!
+
+# One quantitative (SPI) among Groups (league)
+
+global |>
+  ggplot(aes(x = spi, y = league)) +
+  geom_boxplot() +
+  theme(axis.text = element_text(size = 8))
+
+```
+
+```{r}
+global |> 
+  group_by(league) |>
+  summarise(MeanSPI = round(mean(spi), 1)) |>
+  arrange(desc(MeanSPI))
+```
+
+------------------------------------------------------------------------
+
+## Describe with psych library
+
+"The following object is masked from..."
+
+`library::function`
+
+```{r}
+library(psych, quietly = TRUE)
+
+psych::describe(global, IQR = TRUE, omit = F)
+
+# Notice the *s by name and league
+
+# Change omit = T: Do not convert non-numerical variables to numeric, omit them instead
+```
+
+------------------------------------------------------------------------
+
+## Describe with Hmisc
+
+```{r}
+Hmisc::describe(global)
+```
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+## ---
+
+# What is correlation?
+
+Benefits of a visual estimate vs. a single number summary
+
+```{r}
+global |>
+  ggplot(aes(x = off, y = spi)) +
+  geom_point() +
+  labs(x = "Offensive Rating", y = "SPI Rating") +
+  theme_minimal()
+```
+
+------------------------------------------------------------------------
+
+Correlation measures the *strength and direction* of the association
+
+Regression quantifies the *nature* of the association
+
+------------------------------------------------------------------------
+
+`r` = a statistic that measures the **strength** and **direction** of a linear association between two quantitative variables
+
+- Correlating GDP and life expectancy for different countries.
+
+- Correlating Apple's stock price with Nvidia's stock price on the same days.
+
+- Correlating temperature and sales across different cities.
+
+------------------------------------------------------------------------
+
+## Correlation Matrix
+
+```{r}
+cor(global$off, global$spi)
+
+# Correlation Matrix
+global |>
+  select(off, spi, def) |>
+  cor()
+
+### Note! Using only "select" (without dplyr::) may cause an error due to conflict
+```
+
+## An obvious correlation
+
+```{r}
+# An obvious correlation
+
+global |>
+  ggplot(aes(x = off, y = off)) +
+  geom_point() +
+  labs(x = "Offensive Rating", y = "Offensive Rating")
+```
+
+### Color by Rank
+
+```{r}
+global |>
+  ggplot(aes(x = off, y = spi, col = rank)) +
+  geom_point() +
+  labs(x = "Offensive Rating", y = "SPI Rating")
+```
+
+```{r}
+global |>
+  ggplot(aes(x = rank, 
+             y = spi)) +
+  geom_point() +
+  labs(x = "Rank", 
+       y = "SPI Rating", 
+       title = paste("r = ", round(cor(global$rank, global$spi), 3))
+       )
+
+global |>
+  dplyr::select(rank, spi) |>
+  cor()
+```
+
+Correlation tells us two things:
+
+- ...
+
+- ...
+
+But it doesn't tell us...
+
+- ...
+- ...
+
+```{r}
+# Data for illustration
+x <- seq(-5, 5, 1)
+y <- x^2
+
+# Numeric summary
+cor(x, y)
+
+# Visual summary
+plot(x, y, pch = 16, main = "Correlation is zero?")
+```
+
+Just because r = 0 does not mean there is **no** association between the two variables.
+
+Conversely, just because r = 0.999 does not mean there is a **linear** association.
+
+[Datasaurus Dozen](https://blog.revolutionanalytics.com/2017/05/the-datasaurus-dozen.html)
+
+Note: The link above is no longer available, but below are some alternative options...
+
+- <https://www.scientificamerican.com/article/what-this-graph-of-a-dinosaur-can-teach-us-about-doing-better-science/>
+
+- <https://rpubs.com/fractalbass/614089>
+
+- <https://jumpingrivers.github.io/datasauRus/>
+
+------------------------------------------------------------------------
+
+Correlation vs. Relationship vs. Association
+
+Bivariate *Quantitative* data vs. Bivariate *Categorical* data
+
+------------------------------------------------------------------------
+
+## ---
+
+# More on Correlation
+
+Correlation is a statistical measure of the **direction** and **strength** of a linear relationship between two quantitative variables on the same individuals.
+
+## Properties of Correlation
+
+1.  "Standardized Covariance"
+
+    $$
+    cov_{xy} = \frac{{}\sum_{i=1}^{n} (x_i - \bar{x})*(y_i - \bar{y})} {n-1}
+    $$
+
+    ```{r}
+    # Covariance
+    cov(global$off, global$spi)
+
+    # Covariance divided by standard deviations
+    cov(global$off, global$spi) / (sd(global$off)*sd(global$spi))
+
+    # Correlation
+    cor(global$off, global$spi)
+    ```
+
+    ------------------------------------------------------------------------
+
+2.  Unitless (and it's not a percent!)
+
+    r = 0.958 does not have units...it does not mean 95.8%!
+
+------------------------------------------------------------------------
+
+3.  Unaffected by adding or multiplying each data value by a constant
+
+```{r}
+# Original correlation
+cor(global$off, global$spi)
+
+# Correlation after transformations
+cor(global$off / 10, 2 * global$spi + 5)
+```
+
+------------------------------------------------------------------------
+
+4.  Switching explanatory and response variables does not change correlation
+
+```{r}
+expl <- global$off
+resp <- global$spi
+
+cor(expl, resp)
+cor(resp, expl)
+```
+
+------------------------------------------------------------------------
+
+5.  Bounds:
+
+$$
+|r| \le 1 \\
+-1 \le r \le 1
+$$
+
+------------------------------------------------------------------------
+
+6.  Shows the strength and direction of the linear association
+
+- We'll use: $|r| \ge 0.8$ as "strong" and $|r| \le 0.4$ as weak
+- Check your domain area!
+
+See ["A Power Primer" Cohen, 1992](https://www2.psych.ubc.ca/~schaller/528Readings/Cohen1992.pdf) on effect sizes in the behavioral sciences.
+
+Page 157 gives small (0.1), medium (0.3), and large (0.5) effect sizes for correlation r
+
+- To visualize various correlations, see [here](https://rpsychologist.com/correlation/)
+
+------------------------------------------------------------------------
+
+7.  Correlation does not imply causation
+
+- *Ice cream sales correlate with shark attacks, therefore, selling ice cream causes shark attacks.*
+
+- [Spurious Correlations](https://www.tylervigen.com/spurious-correlations)
+
+- [Fiedler, "Voodoo Correlations are Everywhere", 2011](https://pubmed.ncbi.nlm.nih.gov/26162135/)
+
+  ------------------------------------------------------------------------
+
+8.  Lots of options
+
+    Pearson's correlation `r`
+
+    Spearman's Rank
+
+    Kendall's Tau
+
+    $\xi$ ("ksaai") More [here](https://towardsdatascience.com/a-new-coefficient-of-correlation-64ae4f260310)
+
+------------------------------------------------------------------------
+
+## Finding Correlation Manually
+
+Population correlation or Sample correlation?
+
+The Pearson's correlation coefficient *r* is
+
+$$
+r_{xy} = \frac{{}\sum_{i=1}^{n} (x_i - \bar{x})*(y_i - \bar{y})} {(n-1)*s_xs_y}
+$$
+
+$$ r = \frac{\Sigma (z_x*z_y)}{n-1} $$
+
+$$
+r = b_1(\frac{s_y}{s_x})
+$$
+
+------------------------------------------------------------------------
+
+## ---
+
+# Correlation in R
+
+## Correlation and NAs
+
+1.  Remove NAs manually (with dplyr)
+2.  Remove NAs with na.omit() (\*caution)
+3.  Use na.rm = TRUE (works for other statistics)
+4.  Another approach (like imputation)
+
+```{r}
+# Some data with missing values (NAs)
+x <- c(10, 15, 18, 21, 27, NA)
+y <- c(NA, 5, 7, 10, 16, NA)
+
+cor(x, y)
+
+cor(x, y, use = "everything") # default, same as above
+
+cor(x, y, use = "complete.obs")
+
+cor(x, y, na.rm = TRUE)
+
+mean(x, na.rm = TRUE)
+```
+
+------------------------------------------------------------------------
+
+Multiple ways to find correlations
+
+- `Base R`
+  - `stats::cor()`
+  - `stats::cor.test()`
+- And many others, like `Hmisc::rcorr()`
+
+## cor()
+
+```{r}
+# Stats package in Base R
+cor(global$off, global$spi)
+
+# Identifying defaults
+cor(global$off, global$spi, method = "pearson", use = "everything")
+
+# Correlation with dplyr & pipe
+global |>
+  select(off, spi) |>
+  cor() |>
+  round(3)
+
+```
+
+------------------------------------------------------------------------
+
+## cor.test()
+
+Null Hypothesis $H_0$: The variables have a correlation of $r = 0$.
+
+Alt Hypothesis $H_a$: The variables do not have a correlation of $r = 0$, i.e, $r \ne 0$.
+
+**In other words...**
+
+Null Hypothesis $H_0$: The variables have no correlation (i.e., $r = 0$).
+
+Alt Hypothesis $H_a$: The variables are correlated (i.e, $r \ne 0$).
+
+Provides p-value and 95% CI
+
+------------------------------------------------------------------------
+
+### Using P-Values
+
+- A p-value less than an alpha level (commonly 0.05) provides statistically significant evidence that the variables are correlated, but it does *not* tell you the effect size (or causation!)
+
+- A large p-value tells us that we don't have evidence that the two variables are correlated.
+
+```{r}
+cor.test(global$off, global$spi, 
+         alternative = "two.sided",      # default
+         method = "pearson",             # default
+         conf.level = 0.95)              # default
+
+```
+
+- `cor()`
+  - Output a single value: the correlation
+  - Can create a correlation matrix analyzing many variables
+- `cor.test()`
+  - Outputs much more detail
+  - Two variables only
+
+```{r}
+# Multiple variables
+global |>
+  select(off, def, spi, rank) |>
+  cor() |>
+  round(3)
+```
+
+------------------------------------------------------------------------
+
+## Interpreting a p-value
+
+Assuming there's no correlation ($r = 0$) between the offense metric and SPi, there's a 0% probability that we'd observe a correlation of r = 0.958 or more extreme, just due to random chance.
+
+Assuming the null hypothesis is true, there's a \[p-value\] probability that we'd observe a correlation of \[r = ...\] or stronger, just due to random chance.
+
+------------------------------------------------------------------------
+
+## ---
+
+# Visualizing Correlation in R
+
+## Correlograms
+
+```{r}
+library(corrgram)
+
+corrgram(global)
+
+corrgram(global, lower.panel = panel.pts)
+ 
+corrgram(global, lower.panel = panel.pts, order = TRUE)
+
+```
+
+```{r}
+corrgram(global,
+         lower.panel = panel.pts,
+         #order = TRUE,
+         diag.panel = panel.density,
+         upper.panel = panel.cor,
+         cor.method = "pearson")
+
+corrgram(global,
+         lower.panel = panel.pts,
+         #order = TRUE,
+         diag.panel = panel.density,
+         upper.panel = panel.pie,
+         cor.method = "pearson")
+
+
+```
+
+```{r}
+# Uncomment upper.panel below; it will throw a warning message due to panel.conf
+
+corrgram(global,
+         lower.panel = panel.pts,
+         order = TRUE,
+         diag.panel = panel.density,
+         #upper.panel = panel.conf
+         )
+```
+
+------------------------------------------------------------------------
+
+## Data Explorer
+
+This R package aims to automate most of data handling and visualization, so that users could focus on studying the data and extracting insights.
+
+See [documentation](https://boxuancui.github.io/DataExplorer/)
+
+```{r}
+library(DataExplorer, quietly = TRUE)
+plot_intro(global)
+```
+
+```{r}
+plot_bar(global)
+```
+
+```{r}
+plot_histogram(global)
+```
+
+```{r}
+plot_qq(global)
+
+# QQ-plots give us visual information about the normality of a variable when checking conditions
+
+## Straight line: roughly normal
+## Curved: not roughly normal
+```
+
+```{r}
+global_leagues <- global |>
+  filter(league %in% c("United Soccer League", 
+                       "Argentina Primera Division", 
+                       "French Ligue 2", 
+                       "Spanish Primera Division", 
+                       "UEFA Europa Conference League")
+         )
+         
+global_leagues |>
+  plot_boxplot(by = "league")
+```
+
+```{r}
+global_3 <- global |>
+  filter(league %in% c("United Soccer League", 
+                       "Argentina Primera Division", 
+                       "French Ligue 2")) |>
+  select(off, spi, def, rank)
+
+plot_scatterplot(global_3, by = "spi")
+
+# With ggplot2: facet_grid or facet_wrap
+```
+
+```{r}
+plot_correlation(global)
+
+# Note warning message
+
+global |>
+  filter(league %in% c("United Soccer League", 
+                       "Argentina Primera Division")) |>
+  mutate(LeagueName = ifelse(league == "United Soccer League", # clean up label on viz
+                             "USL", 
+                             "APD")) |>
+  select(off, spi, def, rank, LeagueName) |>
+  plot_correlation()
+```
+
+------------------------------------------------------------------------
+
+## Extension: Yet another library to visualize correlations
+
+```{r}
+#install.packages("corrplot")
+library(corrplot, quietly = TRUE)
+
+```
+
+```{r}
+glimpse(global)
+```
+
+```{r}
+# Select all the rows but only the quantitative columns
+
+globalQuant <- global[,c(1, 2, 5, 6, 7)]
+```
+
+```{r}
+corrplot(as.matrix(globalQuant), 
+         type = "upper", 
+         method = "square", 
+         addCoef.col = "black", 
+         diag = FALSE, 
+         is.corr = FALSE)
+```
+
+# ---
+
+# Correlation Funnels
+
+A correlation funnel is a helpful visualization tool to rank how numerous variables correlate with a response variable.
+
+## Point-biserial correlation
+
+Point-Biserial correlation: When we compare a continuous variable to a dichotomous (binary) one, like yes/no, true/false.
+
+Point-Biserial is mathematically equivalent to Pearson's correlation, but has different assumptions
+
+[Documentation on biserial.cor()](https://search.r-project.org/CRAN/refmans/ltm/html/biserial.cor.html)
+
+## Churn Dataset
+
+Correlation funnel documentation [here](https://cran.r-project.org/web/packages/correlationfunnel/vignettes/introducing_correlation_funnel.html) and [here](https://www.r-bloggers.com/2019/08/introducing-correlationfunnel-v0-1-0-speed-up-exploratory-data-analysis-by-100x/)
+
+Data: telecommunications company's customer information, and in particular, whether or not the customer has churned.
+
+- Customer leaves the company = "churn"
+
+- Customer stays with the company = "no churn"
+
+- [Churn rate](https://en.wikipedia.org/wiki/Churn_rate)
+
+See help documentation.
+
+```{r}
+#install.packages("correlationfunnel")
+library(correlationfunnel, quietly = TRUE)
+```
+
+```{r}
+data("customer_churn_tbl") # from correlationfunnel package
+
+# Describe the first individual in the dataset
+customer_churn_tbl |> 
+  head(1) |> 
+  transpose() # to make column names more readable
+
+```
+
+Lots of categorical data here!
+
+------------------------------------------------------------------------
+
+## Exploring Customer Churn
+
+```{r}
+DataExplorer::plot_intro(customer_churn_tbl)
+```
+
+```{r}
+Hmisc::describe(customer_churn_tbl)
+```
+
+```{r}
+# View a summary of the numeric variables only
+customer_churn_tbl |>
+  keep(is.numeric) |>
+  summary()
+
+# SeniorCitizen?
+# Note NAs
+
+```
+
+```{r}
+# View summary of categorical data
+customer_churn_tbl |>
+  keep(is.character) |>
+  summary()
+
+# View summary of factor data (doesn't work; why?)
+# customer_churn_tbl |>
+#   keep(is.factor) |>
+#   summary()
+
+### On Mac: Shift + Command + C
+
+```
+
+------------------------------------------------------------------------
+
+## Using a correlation funnel
+
+### 1. Prepare data as binary features
+
+```{r}
+# Remove the unhelpful customerID
+# Use monthly charges if TotalCharges is NA
+# Use binarize() to bin numeric/quantitative data and force small bins to "other"
+
+customer_churn_binarized_tbl <- customer_churn_tbl |>
+  select(-customerID) |>
+  mutate(TotalCharges = ifelse(is.na(TotalCharges), 
+                               MonthlyCharges, 
+                               TotalCharges)) |>
+  binarize(n_bins = 5, 
+           thresh_infreq = 0.01, 
+           name_infreq = "OTHER", 
+           one_hot = TRUE)
+
+# Adjust binarize() settings and investigate what they do
+```
+
+Check out the new data set with all numeric, binary variables. Note, too, the variable names.
+
+```{r}
+head(customer_churn_binarized_tbl, 5)
+```
+
+More on [One-hot encoding](https://datatricks.co.uk/one-hot-encoding-in-r-three-simple-methods)
+
+------------------------------------------------------------------------
+
+### 2. Correlate to the target
+
+"Did the customer churn?" is our target
+
+```{r}
+customer_churn_corr_tbl <- customer_churn_binarized_tbl |>
+  correlate(Churn__Yes)
+
+customer_churn_corr_tbl
+```
+
+------------------------------------------------------------------------
+
+### 3. Plot the funnel
+
+```{r}
+customer_churn_corr_tbl |>
+  plot_correlation_funnel()
+```
+
+### 4. What business insights do we recommend?
+
+------------------------------------------------------------------------
+
+## Extension: Grouping before funneling
+
+Let's compare those with and without internet service
+
+### With Internet Service
+
+```{r}
+# Only consider those WITH internet service
+
+# 1) Clean & Binarize
+customer_churn_binarized_tbl_net <- customer_churn_tbl |>
+  select(-customerID) |>
+  filter(InternetService != "No") |>                     #### NEW FILTER
+  mutate(TotalCharges = ifelse(is.na(TotalCharges), 
+                               MonthlyCharges, 
+                               TotalCharges)) |>
+  binarize(n_bins = 5, 
+           thresh_infreq = 0.01, 
+           name_infreq = "OTHER", 
+           one_hot = TRUE)
+# 2) Correlate with target
+customer_churn_corr_tbl_net <- customer_churn_binarized_tbl_net |>
+  correlate(Churn__Yes)
+
+# 3) Plot funnel
+customer_churn_corr_tbl_net |>
+  plot_correlation_funnel()
+```
+
+### Without Internet Service
+
+```{r}
+# Only consider those WITHOUT internet service
+
+# 1) Clean & Binarize
+customer_churn_binarized_tbl_no_net <- customer_churn_tbl |>
+  select(-customerID) |>
+  filter(InternetService == "No") |>                           #### NEW FILTER
+  mutate(TotalCharges = ifelse(is.na(TotalCharges), 
+                               MonthlyCharges, 
+                               TotalCharges)) |>
+  binarize(n_bins = 5, 
+           thresh_infreq = 0.01, 
+           name_infreq = "OTHER", 
+           one_hot = TRUE)
+
+# 2) Correlate with target
+customer_churn_corr_tbl_no_net <- customer_churn_binarized_tbl_no_net |>
+  correlate(Churn__Yes)
+
+# 3) Plot funnel
+customer_churn_corr_tbl_no_net |>
+  plot_correlation_funnel()
+```
+
+------------------------------------------------------------------------
+
+## ---
+
+# Spearman Rank Correlation
+
+## Why Spearman?
+
+**Pearson's correlation coefficient**
+
+- Not resistant to extreme values (based on mean & SD)
+
+- Assumes association is linear (linearity assumption)
+
+**Spearman's correlation**
+
+- For ranked data
+
+- Nonparametric
+
+- First, data ranked, then the ranks are used in Pearson's equation
+
+- Formula:
+
+$$
+r_S=1-\frac{6\sum_{i=1}^{n}d_i^2}{n(n^2-1)} 
+\\
+\mbox{where } d_i=R(x_i)-R(y_i)
+$$
+
+For more on Spearman, see [*Learning Stats with R* on Spearman](https://learningstatisticswithr.com/book/descriptives.html#spearmans-rank-correlations)
+
+```{r}
+x <- c(1:10)
+y <- x^2
+plot(x, y, pch = 16)
+
+cat("Pearson:", cor(x, y, method = "pearson"), "\n")
+cat("Spearman:", cor(x, y, method = "spearman"), "\n")
+cat("Kendall's:", cor(x, y, method = "kendall"))
+
+# Note: The "\n" creates a new line
+
+```
+
+------------------------------------------------------------------------
+
+## Example
+
+A large corporation selects graduates for employment by using both interviews and a psychological achievement test. Interviews conducted at the home office of the company were far more expensive than the test, which could be conducted on campus. Consequently, the personnel office was interested in determining whether the test scores were correlated with interview ratings and whether the tests could be substituted for interviews. The idea was not to eliminate interviews but to reduce their number. Ten prospects were ranked during interviews and then tested. The table shows the paired scores. (Wackerly, et al., *MSwA*, 7th, p. 788)
+
+| Subject | Interview Rank | Test Score |
+|---------|----------------|------------|
+| 1       | 8              | 74         |
+| 2       | 5              | 81         |
+| 3       | 10             | 67         |
+| 4       | 3              | 83         |
+| 5       | 6              | 66         |
+| 6       | 1              | 94         |
+| 7       | 4              | 96         |
+| 8       | 7              | 70         |
+| 9       | 9              | 61         |
+| 10      | 2              | 86         |
+
+```{r}
+subject <- c(1:10)
+rank <- c(8, 5, 10, 3, 6, 1, 4, 7, 9, 2)
+score <- c(74, 81, 67, 83, 66, 94, 96, 70, 61, 86)
+
+prospects <- tibble(subject, rank, score)
+prospects
+
+# Explain "rank"
+```
+
+```{r}
+# Check histogram for normality
+prospects |>
+  ggplot(aes(x = rank)) +
+  geom_histogram(binwidth = 2)
+```
+
+First, a caution about "rank": what would a *positive* correlation tell us in this context?
+
+```{r}
+prospects |>
+  select(-subject) |>
+  cor(method = "pearson")
+
+prospects |>
+  select(-subject) |>
+  cor(method = "spearman")
+
+```
+
+Do the data provide sufficient evidence to indicate that the correlation between interview rankings and test scores is less than zero?
+
+```{r}
+cor.test(prospects$rank, prospects$score, method = "spearman", alternative = "less")
+```
+
+**Interpretation:**
+
+Assuming there is no correlation between rank and score, there is a 0.003406 probability that we would observe a correlation of r_s = -0.818 due to random chance alone.
+
+**Conclusion:**
+
+Since 0.003406 is so small (less than 0.05), we reject the null hypothesis and have convincing evidence that the correlation between interview rankings and test score is less than 0.
+
+------------------------------------------------------------------------
+
+## Extension: Calculating Spearman's Correlation Manually
+
+| Subject | Interview Rank | Test Score (Rank) | $d_i$ | $d_i^2$ |
+|---------|----------------|-------------------|-------|---------|
+| 1       | 8              | 74 (5)            | 3     | 9       |
+| 2       | 5              | 81 (6)            | -1    | 1       |
+| 3       | 10             | 67 (3)            | 7     | 49      |
+| 4       | 3              | 83 (7)            | -4    | 16      |
+| 5       | 6              | 66 (2)            | 4     | 16      |
+| 6       | 1              | 94 (9)            | -8    | 64      |
+| 7       | 4              | 96 (10)           | -6    | 36      |
+| 8       | 7              | 70 (4)            | 3     | 9       |
+| 9       | 9              | 61 (1)            | 8     | 64      |
+| 10      | 2              | 86 (8)            | -6    | 36      |
+
+```{r}
+# Store squared differences from table above
+dsq <- c(9, 1, 49, 16, 16, 64, 36, 9, 64, 36)
+n <- nrow(prospects)
+
+# Use Spearman formula
+1 - 6*sum(dsq) / (n*(n^2-1))
+
+# Calculate Spearman correlation
+cor(prospects$rank, prospects$score, method = "spearman")
+
+# Calculate Spearman with ranks and Pearson's formula
+rank1 <- prospects$rank
+rank2 <- c(5, 6, 3, 7, 2, 9, 10, 4, 1, 8)
+cor(rank1, rank2)
+
+
+```
+
+### Notes
+
+- 1: When I ranked the test scores, I used rank 1 for the lowest score (61) to match the sign of the Spearman correlation.
+
+- 2: The Spearman formula in these notes is a short-cut formula and only works if there are no ties in the rankings.
+
+- 3: Pearson matches Spearman if you use the ranked data for both x and y.
+
+------------------------------------------------------------------------
+
+## ---
+
+# Other Resources
+
+Frank E. Harrell, Jr. [*Regression Modeling Strategies (with apps to linear models, logistic and ordinal regression and survival analysis)*](https://warin.ca/ressources/books/2015_Book_RegressionModelingStrategies.pdf)
+
+Ludwig Fahmeir, et al., [Regression: Models, Methods, and Applications](https://sadbhavnapublications.org/research-enrichment-material/2-Statistical-Books/Regression-Models,-Methods-and-Applications.pdf)
+
+[What are regression coefficients?](https://articles.outlier.org/coefficient-regression-formula#section-what-are-regression-coefficients)
+
+------------------------------------------------------------------------
+
+This material is for enrolled students' academic use only and protected under U.S. Copyright Laws. This content must not be shared outside the confines of this course, in line with Eastern University's academic integrity policies. Unauthorized reproduction, distribution, or transmission of this material, including but not limited to posting on third-party platforms like GitHub, is strictly prohibited and may lead to disciplinary action. You may not alter or remove any copyright or other notice from copies of any content taken from BrightSpace or Eastern University's website. © Copyright Notice 2024, Eastern University - All Rights Reserved
+
+------------------------------------------------------------------------
+
+# EXTRA
+
+# Partial and Semi-Partial Correlations
+
+## ppcor
+
+```{r}
+#install.packages("ppcor")
+library(ppcor)
+
+# Note "masking"
+
+```
+
+*VERY* Important! "The following object is masked from `dplyr::select`"!
+
+This means if you use `select()`, R will assume you are wanting to use the `ppcor::select` rather than `dplyr::select`.
+
+```{r}
+library(dplyr) # to resolve masking issue
+```
+
+```{r}
+# Correlation between churn & tenure without controlling for a third variable
+
+cor(customer_churn_binarized_tbl$Churn__Yes, 
+    customer_churn_binarized_tbl$`tenure__-Inf_6`)
+```
+
+## Partial correlations
+
+**Partial correlations** control for the effect of a third variable on the two other variables.
+
+Suppose X and Y are correlated at r = 0.65.
+
+But Z is correlated to both X and Y at r = 0.25.
+
+This makes the partial correlation of X and Y (controlling for Z) as 0.65-0.25 = 0.40.
+
+`pcor.test()`
+
+```{r}
+# Partial correlation controlling for "Month-to-Month" effect on Churn and Tenure
+pcor.test(customer_churn_binarized_tbl$Churn__Yes, 
+          customer_churn_binarized_tbl$`tenure__-Inf_6`,
+          customer_churn_binarized_tbl$`Contract__Month-to-month`)
+
+```
+
+## Semi-partial correlations
+
+**Semi-partial correlations** control for the effect of a third variable on only one of the two variables.
+
+`spcor.test()`
+
+```{r}
+# Semi-partial correlation controlling for "Month-to-Month" effect on only tenure
+spcor.test(customer_churn_binarized_tbl$Churn__Yes, 
+           customer_churn_binarized_tbl$`tenure__-Inf_6`, 
+           customer_churn_binarized_tbl$`Contract__Month-to-month`)
+
+```
+
+## Summary
+
+*Partial correlation*: Looks for the unique relationship between two variables when other variables are ruled out
+
+*Semi-partial correlation*: Useful when trying to explain the variance in one variable in particular (the outcome)
+
+## Formulas
+
+Partial correlation: $$r_{12.3}=\frac{r_{12}-r_{13}r_{23}}{\sqrt{(1-r_{13}^2)}\sqrt{(1-r_{23}^2)}}$$
+
+Semi-partial correlation: $$r_{1(2.3)}=\frac{r_{12}-r_{13}r_{23}}{\sqrt{(1-r_{23}^2)}}$$
+
+## Resources on Partial & Semi-Partial Correlations
+
+[Partial and Semi-partial Correlations](https://youtu.be/OpAf4N582bA?si=gt-cZTN3QOC-84LO) (12:28)
+
+[Semi-partial Correlation in R: Step-by-Step](https://www.youtube.com/watch?v=zDJu5XmqHTo) (02:07)
+
+[Diagrams explaining partial and semi-partial](https://www3.nd.edu/~rwilliam/stats1/x93.pdf#page=6)
+
+[Partial and Semi-partial correlation](http://faculty.cas.usf.edu/mbrannick/regression/Partial.html)
+
+------------------------------------------------------------------------
